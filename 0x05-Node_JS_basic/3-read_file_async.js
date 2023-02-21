@@ -1,50 +1,42 @@
 const fs = require('fs');
 
-async function countStudents(filepath) {
-  try {
-    const csv = await fs.promises.readFile(filepath, { encoding: 'utf8' });
-    const headerArray = csv.split(/\r?\n|\n/);
-    const headers = headerArray[0].split(',');
+const countStudents = (path) => {
+  const promise = (res, rej) => {
+    fs.readFile(path, 'utf8', (err, resData) => {
+      if (!err) {
+        const printOut = [];
+        let printItem; // item to printed
+        const data = resData.toString().split('\n');
+        let students = data.filter((item) => item);
+        students = students.map((item) => item.split(','));
+        printItem = `Number of students: ${students.length - 1}`;
+        console.log(printItem);
+        printOut.push(printItem);
 
-    // strip headers and convert to list of dicts
-    const dictList = [];
-    const noHeaderArray = headerArray.slice(1);
-    for (let i = 0; i < noHeaderArray.length; i += 1) {
-      const data = noHeaderArray[i].split(',');
-      if (data.length === headers.length) {
-        const row = {};
-        for (let j = 0; j < headers.length; j += 1) {
-          row[headers[j].trim()] = data[j].trim();
+        const fields = {};
+        for (const student in students) {
+          if (student !== 0) {
+            if (!fields[students[student][3]]) {
+              fields[students[student][3]] = [];
+            }
+            fields[students[student][3]].push(students[student][0]);
+          }
         }
-        dictList.push(row);
-      }
-    }
-
-    // count and collect first names of students per field
-    let countCS = 0;
-    let countSWE = 0;
-    const studentsCS = [];
-    const studentsSWE = [];
-
-    dictList.forEach((element) => {
-      if (element.field === 'CS') {
-        countCS += 1;
-        studentsCS.push(element.firstname);
-      } else if (element.field === 'SWE') {
-        countSWE += 1;
-        studentsSWE.push(element.firstname);
+        delete fields.field;
+        for (const key of Object.keys(fields)) {
+          printItem = `Number of students in ${key}: ${
+            fields[key].length}. List: ${fields[key].join(', ')}`;
+          console.log(printItem);
+          printOut.push(printItem);
+        }
+        res(printOut);
+      } else {
+        rej(new Error('Cannot load the database'));
       }
     });
+  };
 
-    const countStudents = countCS + countSWE;
-
-    // print statements
-    console.log(`Number of students: ${countStudents}`);
-    console.log(`Number of students in CS: ${countCS}. List: ${studentsCS.toString().split(',').join(', ')}`);
-    console.log(`Number of students in SWE: ${countSWE}. List: ${studentsSWE.toString().split(',').join(', ')}`);
-  } catch (err) {
-    throw new Error('Cannot load the database');
-  }
-}
+  return new Promise(promise);
+};
 
 module.exports = countStudents;

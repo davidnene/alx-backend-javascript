@@ -1,88 +1,68 @@
 const http = require('http');
 const fs = require('fs');
 
-async function countStudents(filepath) {
-  try {
-    const csv = await fs.promises.readFile(filepath, { encoding: 'utf8' });
-    const headerArray = csv.split(/\r?\n|\n/);
-    const headers = headerArray[0].split(',');
-
-    // strip headers and convert to list of dicts
-    const dictList = [];
-    const noHeaderArray = headerArray.slice(1);
-    for (let i = 0; i < noHeaderArray.length; i += 1) {
-      const data = noHeaderArray[i].split(',');
-      if (data.length === headers.length) {
-        const row = {};
-        for (let j = 0; j < headers.length; j += 1) {
-          row[headers[j].trim()] = data[j].trim();
-        }
-        dictList.push(row);
-      }
-    }
-
-    // count and collect first names of students per field
-    let countCS = 0;
-    let countSWE = 0;
-    const studentsCS = [];
-    const studentsSWE = [];
-
-    dictList.forEach((element) => {
-      if (element.field === 'CS') {
-        countCS += 1;
-        studentsCS.push(element.firstname);
-      } else if (element.field === 'SWE') {
-        countSWE += 1;
-        studentsSWE.push(element.firstname);
-      }
-    });
-
-    const countStudents = countCS + countSWE;
-
-    return ({
-      countStudents,
-      countCS,
-      countSWE,
-      studentsCS,
-      studentsSWE,
-    });
-  } catch (err) {
-    throw new Error('Cannot load the database');
-  }
-}
-
-const pathToDB = process.argv[2];
-const hostname = '127.0.0.1';
+const path = process.argv[2];
 const port = 1245;
 
+const countStudents = (path) => {
+  const promise = (res, rej) => {
+    fs.readFile(path, 'utf8', (err, resData) => {
+      if (!err) {
+        const printOut = [];
+        let printItem; // item to printed
+        const data = resData.toString().split('\n');
+        let students = data.filter((item) => item);
+        students = students.map((item) => item.split(','));
+        printItem = `Number of students: ${students.length - 1}`;
+        console.log(printItem);
+        printOut.push(printItem);
+
+        const fields = {};
+        for (const student in students) {
+          if (student !== 0) {
+            if (!fields[students[student][3]]) {
+              fields[students[student][3]] = [];
+            }
+            fields[students[student][3]].push(students[student][0]);
+          }
+        }
+        delete fields.field;
+        for (const key of Object.keys(fields)) {
+          printItem = `Number of students in ${key}: ${
+            fields[key].length}. List: ${fields[key].join(', ')}`;
+          console.log(printItem);
+          printOut.push(printItem);
+        }
+        res(printOut);
+      } else {
+        rej(new Error('Cannot load the database'));
+      }
+    });
+  };
+
+  return new Promise(promise);
+};
+
 const app = http.createServer((req, res) => {
-  res.statusCode = 200;
-  res.setHeader('Content-Type', 'text/plain');
   if (req.url === '/') {
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'text/plain');
     res.end('Hello Holberton School!');
-  } else if (req.url === '/students') {
-    // call async function and collect needed variables
-    countStudents(pathToDB)
-      .then(({
-        countStudents,
-        countCS,
-        countSWE,
-        studentsCS,
-        studentsSWE,
-      }) => {
-        res.write('This is the list of our students\n');
-        res.write(`Number of students: ${countStudents}\n`);
-        res.write(`Number of students in CS: ${countCS}. List: ${studentsCS.toString().split(',').join(', ')}\n`);
-        res.write(`Number of students in SWE: ${countSWE}. List: ${studentsSWE.toString().split(',').join(', ')}`);
-        res.end();
+  }
+  if (req.url === '/students') {
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'text/plain');
+    countStudents(path)
+      .then((data) => {
+        res.end(`This is the list of our students\n${data.join('\n')}`);
       })
-      .catch(() => {
-        res.end('Error: Cannot load the database');
-        throw new Error('Cannot load the database');
+      .catch((error) => {
+        res.end(error);
       });
   }
 });
 
-app.listen(port, hostname);
+app.listen(port, () => {
+});
 
 module.exports = app;

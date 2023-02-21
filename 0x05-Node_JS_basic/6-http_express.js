@@ -5,6 +5,9 @@ const port = 1245;
 
 app.get('/', (req, res) => {
   res.send('Hello Holberton School!');
-}).listen(port);
+});
+
+app.listen(port, () => {
+});
 
 module.exports = app;
